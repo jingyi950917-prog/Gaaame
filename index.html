@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Star-Miner Mobile</title>
+    <style>
+        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: Arial; }
+        canvas { display: block; background: #000; }
+        #ui { position: absolute; top: 10px; left: 10px; color: white; font-size: 20px; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="ui">Score: <span id="score">0</span></div>
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let score = 0;
+        let player = { x: canvas.width / 2 - 25, y: canvas.height - 80, w: 50, h: 50 };
+        let items = [];
+
+        // 触摸控制
+        window.addEventListener('touchmove', (e) => {
+            let touch = e.touches[0];
+            player.x = touch.clientX - player.w / 2;
+        });
+
+        function spawnItem() {
+            const isEnemy = Math.random() < 0.3;
+            items.push({
+                x: Math.random() * (canvas.width - 30),
+                y: -30,
+                w: 30,
+                h: 30,
+                type: isEnemy ? 'enemy' : 'gold',
+                speed: 4 + Math.random() * 4
+            });
+        }
+
+        function update() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 画玩家
+            ctx.fillStyle = '#00CCFF';
+            ctx.fillRect(player.x, player.y, player.w, player.h);
+
+            for (let i = items.length - 1; i >= 0; i--) {
+                let item = items[i];
+                item.y += item.speed;
+
+                // 画物体
+                ctx.fillStyle = item.type === 'enemy' ? '#FF3333' : '#FFD700';
+                ctx.fillRect(item.x, item.y, item.w, item.h);
+
+                // 碰撞检测
+                if (item.x < player.x + player.w && item.x + item.w > player.x &&
+                    item.y < player.y + player.h && item.y + item.h > player.y) {
+                    if (item.type === 'enemy') {
+                        alert("Game Over! Score: " + score);
+                        score = 0;
+                        items = [];
+                    } else {
+                        score += 10;
+                    }
+                    items.splice(i, 1);
+                    continue;
+                }
+
+                if (item.y > canvas.height) items.splice(i, 1);
+            }
+
+            scoreElement.innerText = score;
+            if (Math.random() < 0.05) spawnItem();
+            requestAnimationFrame(update);
+        }
+
+        update();
+    </script>
+</body>
+</html>
