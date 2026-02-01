@@ -3,15 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Star-Miner Mobile</title>
+    <title>Star-Miner Pro</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; touch-action: none; font-family: Arial; }
-        canvas { display: block; background: #000; }
-        #ui { position: absolute; top: 10px; left: 10px; color: white; font-size: 20px; pointer-events: none; }
+        body { margin: 0; background: #0a0a12; overflow: hidden; touch-action: none; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; }
+        #ui { 
+            position: absolute; top: 40px; left: 20px; color: #00e5ff; 
+            font-size: 24px; font-weight: bold; text-shadow: 0 0 10px rgba(0,229,255,0.5);
+            pointer-events: none; 
+        }
     </style>
 </head>
 <body>
-    <div id="ui">Score: <span id="score">0</span></div>
+    <div id="ui">CORE_ENERGY: <span id="score">0</span></div>
     <canvas id="gameCanvas"></canvas>
 
     <script>
@@ -23,61 +27,112 @@
         canvas.height = window.innerHeight;
 
         let score = 0;
-        let player = { x: canvas.width / 2 - 25, y: canvas.height - 80, w: 50, h: 50 };
+        let player = { x: canvas.width / 2, y: canvas.height - 100, r: 25 };
         let items = [];
+        let particles = [];
 
-        // 触摸控制
+        // 震动反馈函数 - 关键：增加沉浸感
+        const vibrate = (ms) => {
+            if (navigator.vibrate) navigator.vibrate(ms);
+        };
+
+        // 粒子效果类
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y;
+                this.color = color;
+                this.size = Math.random() * 5 + 2;
+                this.speedX = (Math.random() - 0.5) * 10;
+                this.speedY = (Math.random() - 0.5) * 10;
+                this.life = 1.0;
+            }
+            update() {
+                this.x += this.speedX; this.y += this.speedY;
+                this.life -= 0.02;
+            }
+            draw() {
+                ctx.fillStyle = `rgba(${this.color}, ${this.life})`;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
         window.addEventListener('touchmove', (e) => {
-            let touch = e.touches[0];
-            player.x = touch.clientX - player.w / 2;
+            player.x = e.touches[0].clientX;
         });
+
+        function createExplosion(x, y, color) {
+            for (let i = 0; i < 10; i++) particles.push(new Particle(x, y, color));
+        }
 
         function spawnItem() {
             const isEnemy = Math.random() < 0.3;
             items.push({
-                x: Math.random() * (canvas.width - 30),
-                y: -30,
-                w: 30,
-                h: 30,
+                x: Math.random() * canvas.width,
+                y: -50,
+                r: 15,
                 type: isEnemy ? 'enemy' : 'gold',
-                speed: 4 + Math.random() * 4
+                speed: 5 + (score / 100) // 难度随分数线性增加，符合逻辑演进
             });
         }
 
+        function drawPlayer() {
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#00e5ff';
+            ctx.fillStyle = '#00e5ff';
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        }
+
         function update() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            // 背景渐变
+            let grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            grd.addColorStop(0, "#0a0a12");
+            grd.addColorStop(1, "#1a1a2e");
+            ctx.fillStyle = grd;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // 画玩家
-            ctx.fillStyle = '#00CCFF';
-            ctx.fillRect(player.x, player.y, player.w, player.h);
+            drawPlayer();
 
+            // 处理粒子
+            particles.forEach((p, i) => {
+                p.update(); p.draw();
+                if (p.life <= 0) particles.splice(i, 1);
+            });
+
+            // 处理物体
             for (let i = items.length - 1; i >= 0; i--) {
-                let item = items[i];
-                item.y += item.speed;
+                let it = items[i];
+                it.y += it.speed;
 
-                // 画物体
-                ctx.fillStyle = item.type === 'enemy' ? '#FF3333' : '#FFD700';
-                ctx.fillRect(item.x, item.y, item.w, item.h);
+                ctx.fillStyle = it.type === 'enemy' ? '#ff3366' : '#ffcf40';
+                ctx.beginPath();
+                ctx.arc(it.x, it.y, it.r, 0, Math.PI * 2);
+                ctx.fill();
 
-                // 碰撞检测
-                if (item.x < player.x + player.w && item.x + item.w > player.x &&
-                    item.y < player.y + player.h && item.y + item.h > player.y) {
-                    if (item.type === 'enemy') {
-                        alert("Game Over! Score: " + score);
-                        score = 0;
-                        items = [];
+                // 圆形碰撞检测公式：$ \sqrt{(x_1-x_2)^2 + (y_1-y_2)^2} < r_1+r_2 $
+                let dist = Math.hypot(player.x - it.x, player.y - it.y);
+                if (dist < player.r + it.r) {
+                    if (it.type === 'enemy') {
+                        vibrate([100, 50, 100]); // 强震
+                        alert("CORE CRITICAL. Score: " + score);
+                        score = 0; items = [];
                     } else {
+                        vibrate(20); // 轻微触感
                         score += 10;
+                        createExplosion(it.x, it.y, "255, 207, 64");
                     }
                     items.splice(i, 1);
                     continue;
                 }
-
-                if (item.y > canvas.height) items.splice(i, 1);
+                if (it.y > canvas.height + 50) items.splice(i, 1);
             }
 
             scoreElement.innerText = score;
-            if (Math.random() < 0.05) spawnItem();
+            if (Math.random() < 0.06) spawnItem();
             requestAnimationFrame(update);
         }
 
