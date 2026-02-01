@@ -92,7 +92,24 @@
                 setTimeout(() => levelNotice.style.opacity = 0, 2000);
             }
         }
-
+        function drawPlayer() {
+            ctx.shadowBlur = 10 + (level * 5);
+            ctx.shadowColor = player.color;
+            ctx.fillStyle = player.color;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
+            ctx.fill();
+            // 绘制护盾环
+            if (level >= 3) {
+                ctx.strokeStyle = player.color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.r + 10, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            ctx.shadowBlur = 0;
+        }
+        
         function spawnItem() {
             const spawnRate = Math.max(0.04, 0.09 - (score / 4000)); 
             if (Math.random() < spawnRate) {
