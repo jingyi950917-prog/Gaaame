@@ -3,127 +3,145 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Star-Miner Pro</title>
+    <title>Star-Miner: Evolution</title>
     <style>
-        body { margin: 0; background: #0a0a12; overflow: hidden; touch-action: none; font-family: 'Segoe UI', sans-serif; }
+        body { margin: 0; background: #05050a; overflow: hidden; touch-action: none; font-family: 'Courier New', monospace; }
         canvas { display: block; }
         #ui { 
-            position: absolute; top: 40px; left: 20px; color: #00e5ff; 
-            font-size: 24px; font-weight: bold; text-shadow: 0 0 10px rgba(0,229,255,0.5);
-            pointer-events: none; 
+            position: absolute; top: 50px; left: 20px; color: #00ffcc; 
+            font-size: 18px; line-height: 1.5; pointer-events: none; 
+            text-shadow: 0 0 5px #00ffcc;
+        }
+        .level-up {
+            position: absolute; top: 40%; width: 100%; text-align: center;
+            color: #fff; font-size: 30px; font-weight: bold; opacity: 0;
+            transition: opacity 0.5s; pointer-events: none;
         }
     </style>
 </head>
 <body>
-    <div id="ui">CORE_ENERGY: <span id="score">0</span></div>
+    <div id="ui">
+        SYSTEM_STATUS: <span id="status">BASIC</span><br>
+        ENERGY_LEVEL: <span id="score">0</span><br>
+        SHIELD: <span id="shield">READY</span>
+    </div>
+    <div id="levelNotice" class="level-up">EVOLUTION COMPLETE</div>
     <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
         const scoreElement = document.getElementById('score');
+        const statusElement = document.getElementById('status');
+        const shieldElement = document.getElementById('shield');
+        const levelNotice = document.getElementById('levelNotice');
 
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
 
         let score = 0;
-        let player = { x: canvas.width / 2, y: canvas.height - 100, r: 25 };
+        let level = 1;
+        let player = { x: canvas.width / 2, y: canvas.height - 120, r: 20, color: '#00e5ff' };
         let items = [];
         let particles = [];
+        let frameCount = 0;
 
-        // 震动反馈函数 - 关键：增加沉浸感
-        const vibrate = (ms) => {
-            if (navigator.vibrate) navigator.vibrate(ms);
-        };
+        const vibrate = (ms) => navigator.vibrate && navigator.vibrate(ms);
 
-        // 粒子效果类
         class Particle {
             constructor(x, y, color) {
-                this.x = x; this.y = y;
-                this.color = color;
-                this.size = Math.random() * 5 + 2;
-                this.speedX = (Math.random() - 0.5) * 10;
-                this.speedY = (Math.random() - 0.5) * 10;
+                this.x = x; this.y = y; this.color = color;
+                this.size = Math.random() * 4;
+                this.speedX = (Math.random() - 0.5) * 8;
+                this.speedY = (Math.random() - 0.5) * 8;
                 this.life = 1.0;
             }
-            update() {
-                this.x += this.speedX; this.y += this.speedY;
-                this.life -= 0.02;
-            }
+            update() { this.x += this.speedX; this.y += this.speedY; this.life -= 0.03; }
             draw() {
                 ctx.fillStyle = `rgba(${this.color}, ${this.life})`;
-                ctx.beginPath();
-                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2); ctx.fill();
             }
         }
 
-        window.addEventListener('touchmove', (e) => {
-            player.x = e.touches[0].clientX;
-        });
+        window.addEventListener('touchmove', (e) => { player.x = e.touches[0].clientX; });
 
-        function createExplosion(x, y, color) {
-            for (let i = 0; i < 10; i++) particles.push(new Particle(x, y, color));
-        }
-
-        function spawnItem() {
-            const isEnemy = Math.random() < 0.3;
-            items.push({
-                x: Math.random() * canvas.width,
-                y: -50,
-                r: 15,
-                type: isEnemy ? 'enemy' : 'gold',
-                speed: 5 + (score / 100) // 难度随分数线性增加，符合逻辑演进
-            });
+        function checkEvolution() {
+            let oldLevel = level;
+            if (score >= 600) { level = 4; player.r = 35; player.color = "#ff00ff"; statusElement.innerText = "GOD_MODE"; }
+            else if (score >= 300) { level = 3; player.r = 30; player.color = "#ffff00"; statusElement.innerText = "ADVANCED"; }
+            else if (score >= 100) { level = 2; player.r = 25; player.color = "#00ffcc"; statusElement.innerText = "STABLE"; }
+            
+            if (level > oldLevel) {
+                vibrate([50, 100, 50, 100]);
+                levelNotice.style.opacity = 1;
+                setTimeout(() => levelNotice.style.opacity = 0, 2000);
+            }
         }
 
         function drawPlayer() {
-            ctx.shadowBlur = 15;
-            ctx.shadowColor = '#00e5ff';
-            ctx.fillStyle = '#00e5ff';
+            ctx.shadowBlur = 10 + (level * 5);
+            ctx.shadowColor = player.color;
+            ctx.fillStyle = player.color;
             ctx.beginPath();
             ctx.arc(player.x, player.y, player.r, 0, Math.PI * 2);
             ctx.fill();
+            // 绘制护盾环
+            if (level >= 3) {
+                ctx.strokeStyle = player.color;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.arc(player.x, player.y, player.r + 10, 0, Math.PI * 2);
+                ctx.stroke();
+            }
             ctx.shadowBlur = 0;
         }
 
+        function spawnItem() {
+            frameCount++;
+            const spawnRate = Math.max(0.03, 0.08 - (score / 5000)); 
+            if (Math.random() < spawnRate) {
+                const isEnemy = Math.random() < (0.3 + (level * 0.05));
+                items.push({
+                    x: Math.random() * canvas.width,
+                    y: -50,
+                    r: 12 + Math.random() * 10,
+                    type: isEnemy ? 'enemy' : 'gold',
+                    speed: 4 + (level * 1.5) + Math.random() * 2
+                });
+            }
+        }
+
         function update() {
-            // 背景渐变
-            let grd = ctx.createLinearGradient(0, 0, 0, canvas.height);
-            grd.addColorStop(0, "#0a0a12");
-            grd.addColorStop(1, "#1a1a2e");
-            ctx.fillStyle = grd;
+            ctx.fillStyle = '#05050a';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             drawPlayer();
+            particles.forEach((p, i) => { p.update(); p.draw(); if (p.life <= 0) particles.splice(i, 1); });
 
-            // 处理粒子
-            particles.forEach((p, i) => {
-                p.update(); p.draw();
-                if (p.life <= 0) particles.splice(i, 1);
-            });
-
-            // 处理物体
             for (let i = items.length - 1; i >= 0; i--) {
                 let it = items[i];
                 it.y += it.speed;
 
                 ctx.fillStyle = it.type === 'enemy' ? '#ff3366' : '#ffcf40';
-                ctx.beginPath();
-                ctx.arc(it.x, it.y, it.r, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.beginPath(); ctx.arc(it.x, it.y, it.r, 0, Math.PI * 2); ctx.fill();
 
-                // 圆形碰撞检测公式：$ \sqrt{(x_1-x_2)^2 + (y_1-y_2)^2} < r_1+r_2 $
                 let dist = Math.hypot(player.x - it.x, player.y - it.y);
                 if (dist < player.r + it.r) {
                     if (it.type === 'enemy') {
-                        vibrate([100, 50, 100]); // 强震
-                        alert("CORE CRITICAL. Score: " + score);
-                        score = 0; items = [];
+                        // Level 4 拥有一次免死金牌逻辑 (INTJ 的容错设计)
+                        if (level >= 4 && Math.random() > 0.5) {
+                            score -= 50;
+                            vibrate(100);
+                        } else {
+                            vibrate([200, 100, 200]);
+                            alert("SYSTEM FAILURE. FINAL SCORE: " + score);
+                            score = 0; level = 1; player.r = 20; player.color = '#00e5ff'; items = [];
+                        }
                     } else {
-                        vibrate(20); // 轻微触感
+                        vibrate(15);
                         score += 10;
-                        createExplosion(it.x, it.y, "255, 207, 64");
+                        checkEvolution();
+                        for(let j=0; j<5; j++) particles.push(new Particle(it.x, it.y, "255, 207, 64"));
                     }
                     items.splice(i, 1);
                     continue;
@@ -132,7 +150,7 @@
             }
 
             scoreElement.innerText = score;
-            if (Math.random() < 0.06) spawnItem();
+            spawnItem();
             requestAnimationFrame(update);
         }
 
